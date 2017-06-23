@@ -1,0 +1,389 @@
+#include "mbed.h"
+#include "header.h"
+#include "moves.h"
+#include "var.h"
+
+ 
+#define NEAR_OBST   30 
+    
+void init_mpu(); 
+void get_measur();
+void compDistIntegr();
+void forward();
+int rotate_right(float degree);
+int rotate_left(float degree);
+void startMean();
+void resetMeasur();
+
+
+double dt=0;
+double speed=0;
+double dist=0;
+double prevay=0;
+double prevspeed=0;
+
+double ayBias;
+double gzBias;
+double m_yaw=0;
+
+//thelei kainourgeis mpataries gia na douleuei kala to ultrasonic alliws vriskei oti nanai
+
+enum state{k1,k2,k3,k4,k5,k6,k7,k8};
+
+int main() {
+    
+    
+   
+    init_mpu();
+  
+    
+    startMean();
+     led=!led;
+    
+    UltaTickerTrig.attach(&UltraTrigStart, 0.2 );   // every 200ms
+    echo.rise(&UltraEchoStart) ;
+    echo.fall(&UltraEchoEnd) ;
+
+   
+    
+    Timer movtimer;
+    movtimer.reset();
+    movtimer.start();
+    
+    while(user_but==1);
+    wait(2);
+   
+   state st=k1;
+    while(1){
+        get_measur();
+        dt=movtimer.read();
+        movtimer.reset();  
+        
+       // pc.printf( "d=%f ", UltraDistancefromObst);
+       pc.printf( "d=%f ", dist);
+        
+      int distflag; 
+      switch(st){
+                
+                case k1:
+                  
+                forward();
+             
+                
+                    
+                if(UltraDistancefromObst<NEAR_OBST){
+                 // pc.printf( "mpuke");
+                  //  if(dist>1.0){
+                    st=k2;
+                    
+                    stop_fun();
+                    wait(1.0);
+                    resetMeasur();
+                    wait(1.0);
+                   
+                    }
+                      
+                break;
+                        
+                
+                case k2:distflag=rotate_left(85);
+                        if(distflag==0){
+                            wait(1.0);
+                            st=k3;
+                        }
+                    break;
+                
+                case k3:forward();
+                       
+                        if(dist>1.0){//otan kanei 1 metro allazei
+                            resetMeasur();
+                                st=k4;
+                                stop_fun();
+                              wait(1.0);
+                            }
+                    break;
+                
+                case k4:distflag=rotate_right(85);
+                        if(distflag==0){
+                            wait(1.0);
+                            st=k5;
+                        }
+                    break;
+                
+                case k5:forward();
+                       
+                        if(dist>1.0 ||UltraDistancefromObst<NEAR_OBST){
+                            
+                            resetMeasur();
+                            st=k6;
+                           stop_fun(); 
+                        wait(1.0);
+                            }
+                    break;
+                
+                case k6:distflag=rotate_right(85);
+                        if(distflag==0){
+                            wait(1.0);
+                            st=k7;
+                        }
+                    break;
+                     
+                 case k7:forward();
+                        
+                        if(dist>1.0){
+			    resetMeasur();	
+                            st=k8;                      
+                            stop_fun();
+                            wait(0.5);
+                            }
+                        
+                    break;
+                 
+                 case k8:distflag=rotate_left(85);
+                        if(distflag==0){
+                            wait(0.5);
+                            st=k1;
+                        }
+                    break;
+                 
+                
+                
+                }
+    
+        
+    
+        
+       
+    
+    }
+}
+
+void resetMeasur(){
+    
+       dt=0;
+     speed=0;
+     dist=0;
+     prevay=0;
+     prevspeed=0;
+     cur_yaw=0;
+
+     des_gz=0;
+     l=0.65;
+     r=0.65;//0.7
+     kerror=0;
+    
+    
+    }
+
+void forward(){
+    
+    
+    
+     kerror=des_gz-gz;
+    
+    
+        
+     l=l+kp*kerror;
+     r=r-kp*kerror;
+     frwd_fun(l,r);    
+      
+    compDistIntegr();
+      
+    printf("%f %f \n",l,r);
+    
+    
+    
+}
+
+int rotate_left(float degree){
+  
+      
+ 
+   
+      cur_yaw+= gz*dt; 
+       
+        
+      if(cur_yaw>-degree)
+        left_fun();
+       else{
+         stop_fun();
+         return 0;
+         } 
+       
+    return 1;
+}
+
+int rotate_right(float degree){
+  
+   
+    
+
+      cur_yaw=cur_yaw- gz*dt; 
+       
+        
+      if(cur_yaw>-degree)
+        right_fun();
+       else{
+         stop_fun();
+         return 0;
+         } 
+       
+    return 1;
+}
+
+
+void compDistIntegr(){
+    
+    speed+=9.81*(ay+prevay)*dt/2;
+    dist+=(speed+prevspeed)*dt/2;
+    
+    prevay=ay;
+    prevspeed=speed;
+    
+    
+    
+    }
+
+
+void startMean(){
+  
+  int counter=0;
+    
+    for(int i=0;i<3000;i++){
+        
+        if(MPU9150.readByte(MPU9150_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+
+        MPU9150.readAccelData(accelCount);  // Read the x/y/z adc values   
+        // Now we'll calculate the accleration value into actual g's
+        ax = (float)accelCount[0]*aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
+        ay = (float)accelCount[1]*aRes; // - accelBias[1];   
+        az = (float)accelCount[2]*aRes; // - accelBias[2];  
+       
+        MPU9150.readGyroData(gyroCount);  // Read the x/y/z adc values
+        // Calculate the gyro value into actual degrees per second
+        gx = (float)gyroCount[0]*gRes; // - gyroBias[0];  // get actual gyro value, this depends on scale being set
+        gy = (float)gyroCount[1]*gRes; // - gyroBias[1];  
+        gz = (float)gyroCount[2]*gRes; // - gyroBias[2];   
+        
+        meanAy+=ay;
+        meanGz+=gz;
+  
+        counter++;
+    
+        }
+        
+    }
+    ayBias=meanAy/counter;
+    gzBias=meanGz/counter;
+    
+    
+    
+
+}
+
+ 
+    
+    
+
+   
+     
+    
+        
+                
+   
+     
+        
+      
+    
+
+
+    
+    
+
+void init_mpu(){
+    
+    pc.baud(9600);  
+
+  pc.printf( "Hello three wheel robotic car\r\n" ) ;    
+  pc.printf("CPU SystemCoreClock is %d Hz\r\n", SystemCoreClock);   
+    
+  //Set up I2C in fast mode: 400 kHz   
+  i2c.frequency(400000);  
+  
+  t.start();        
+  
+ 
+  // Read the WHO_AM_I register, this is a good test of communication
+  uint8_t whoami = MPU9150.readByte(MPU9150_ADDRESS, WHO_AM_I_MPU9150);  // Read WHO_AM_I register for MPU-9250
+  pc.printf("I AM 0x%x\n\r", whoami); pc.printf("I SHOULD BE 0x68\n\r");
+  
+  if (whoami == 0x68) // WHO_AM_I should be 0x68
+  {  
+    pc.printf("MPU9150 WHO_AM_I is 0x%x\n\r", whoami);
+    pc.printf("MPU9150 is online...\n\r");
+    wait(1);
+    
+    MPU9150.MPU9150SelfTest(SelfTest);
+    pc.printf("x-axis self test: acceleration trim within %f % of factory value\n\r", SelfTest[0]);
+    pc.printf("y-axis self test: acceleration trim within %f % of factory value\n\r", SelfTest[1]);
+    pc.printf("z-axis self test: acceleration trim within %f % of factory value\n\r", SelfTest[2]);
+    pc.printf("x-axis self test: gyration trim within %f % of factory value\n\r", SelfTest[3]);
+    pc.printf("y-axis self test: gyration trim within %f % of factory value\n\r", SelfTest[4]);
+    pc.printf("z-axis self test: gyration trim within %f % of factory value\n\r", SelfTest[5]);
+    wait(1);
+    MPU9150.resetMPU9150(); // Reset registers to default in preparation for device calibration
+    MPU9150.calibrateMPU9150(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers  
+    pc.printf("x gyro bias = %f\n\r", gyroBias[0]);
+    pc.printf("y gyro bias = %f\n\r", gyroBias[1]);
+    pc.printf("z gyro bias = %f\n\r", gyroBias[2]);
+    pc.printf("x accel bias = %f\n\r", accelBias[0]);
+    pc.printf("y accel bias = %f\n\r", accelBias[1]);
+    pc.printf("z accel bias = %f\n\r", accelBias[2]);
+    wait(1);
+    MPU9150.initMPU9150(); 
+    pc.printf("MPU9150 initialized for active data mode....\n\r"); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+    MPU9150.initAK8975A(magCalibration);
+    pc.printf("AK8975 initialized for active data mode....\n\r"); // Initialize device for active mode read of magnetometer
+    
+   }
+   else
+   {
+    pc.printf("Could not connect to MPU9150: \n\r");
+    pc.printf("%#x \n",  whoami);
+    while(1) ; // Loop forever if communication doesn't happen
+    }
+
+     MagRate = 10; // set magnetometer read rate in Hz; 10 to 100 (max) Hz are reasonable values
+    MPU9150.getAres(); // Get accelerometer sensitivity
+    MPU9150.getGres(); // Get gyro sensitivity
+    mRes = 10.*1229./4096.; // Conversion from 1229 microTesla full scale (4096) to 12.29 Gauss full scale
+    // So far, magnetometer bias is calculated and subtracted here manually, should construct an algorithm to do it automatically
+    // like the gyro and accelerometer biases
+    magbias[0] = -5.;   // User environmental x-axis correction in milliGauss
+    magbias[1] = -95.;  // User environmental y-axis correction in milliGauss
+    magbias[2] = -260.; // User environmental z-axis correction in milliGauss
+    }
+
+
+void get_measur(){
+    // If intPin goes high, all data registers have new data
+  if(MPU9150.readByte(MPU9150_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+
+    MPU9150.readAccelData(accelCount);  // Read the x/y/z adc values   
+    // Now we'll calculate the accleration value into actual g's
+    ax = (float)accelCount[0]*aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
+    ay = (float)accelCount[1]*aRes -ayBias;// - accelBias[1];   
+    az = (float)accelCount[2]*aRes; // - accelBias[2];  
+   
+    MPU9150.readGyroData(gyroCount);  // Read the x/y/z adc values
+    // Calculate the gyro value into actual degrees per second
+    gx = (float)gyroCount[0]*gRes; // - gyroBias[0];  // get actual gyro value, this depends on scale being set
+    gy = (float)gyroCount[1]*gRes; // - gyroBias[1];  
+    gz = (float)gyroCount[2]*gRes;//+ gzBias;// - gyroBias[2];   
+  
+    
+  }
+   
+   
+ 
+ }

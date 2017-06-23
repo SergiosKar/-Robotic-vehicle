@@ -1,0 +1,129 @@
+
+//Left wheel
+DigitalOut in1(PC_10);
+DigitalOut in2(PC_11);
+PwmOut ena(PC_2);
+
+
+//Right wheel
+DigitalOut in3(PA_13);
+DigitalOut in4(PA_14);
+PwmOut enb(PC_3);
+
+DigitalOut led(LED1);
+DigitalIn  user_but(PC_13);
+
+
+enum type{ still,frwd_str ,back_strt, right ,right_fast, left,left_fast,stop};
+
+typedef struct{
+    float time;
+    type move_type;  
+    }Move;
+    
+    
+    
+void frwd_fun(float l,float r){
+    
+    ena.write(l);
+    
+    in1=1;
+    in2=0;
+    
+   enb.write(r);
+    in3=1;
+    in4=0;
+    
+    
+    }
+    
+
+void back_fun(){
+    
+    ena.write(0.93);
+    in1=0;
+    in2=1;
+    
+    enb.write(0.89);
+    in3=0;
+    in4=1;
+    
+    }
+
+
+void left_fun(){
+    
+    ena.write(0);
+    
+    
+    enb.write(0.4);
+    in3=1;
+    in4=0;
+    
+    }
+
+
+void leftfast_fun(){
+    
+    ena.write(0.4);
+    in1=0;
+    in2=1;
+    
+    enb.write(0.4);
+    in3=1;
+    in4=0;
+    
+   
+    
+    }
+    
+    
+
+void right_fun(){
+    
+    ena.write(0.4);
+    in1=1;
+    in2=0;
+    
+    enb.write(0);
+    
+   
+    
+    }
+    
+
+void rightfast_fun(){
+    
+    ena.write(0.4);
+    in1=1;
+    in2=0;
+    
+    enb.write(0.9);
+    in3=0;
+    in4=1;
+    
+    }
+    
+        
+
+void stop_fun(){
+    
+     ena.write(0.9);
+    in1=1;
+    in2=1;
+    
+    enb.write(0.9);
+    in3=1;
+    in4=1;
+    
+    }
+    
+void still_fun(){
+
+     ena.write(0);
+     enb.write(0);
+
+
+    }
+ 
+    

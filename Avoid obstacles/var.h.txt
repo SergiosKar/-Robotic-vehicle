@@ -1,0 +1,72 @@
+
+
+// ********for MPU ************************************************************************************************************        
+float sum = 0;
+uint32_t sumCount = 0, mcount = 0;
+char buffer[14];
+
+   MPU9150 MPU9150;
+   
+   Timer t;
+
+   Serial pc(USBTX, USBRX); // tx, rx
+
+// ********************************************************************************************************************        
+
+//*****************Control********************************************************************************************
+double meanAy=0;
+double meanGz=0;
+
+double vel =0.38;//6.28 s ta 2 metra
+   
+   float des_gz=0;
+    float l=0.65;
+    float r=0.65;//0.7
+    float kerror=0;
+    float kp=0.0005;
+
+     float cur_yaw=0;
+
+
+//************************************************************************************************************************
+
+
+//*********************UltraSound**********************************************************************************************
+
+DigitalOut trigger(PC_6);
+InterruptIn  echo(PC_8);
+
+Ticker   UltaTickerTrig ;
+
+Timer echotimer;
+float UltraDistancefromObst ;
+float UltraEchoTime ;
+
+
+void UltraTrigStart() {
+//    led=1 ;
+    trigger = 1 ;
+    wait_us(0.2) ;
+    trigger = 0 ;
+//    led=0 ;
+}
+
+
+void UltraEchoStart() {
+    echotimer.reset() ;
+    echotimer.start() ;
+    led=1 ;
+}
+
+
+
+void UltraEchoEnd() {
+    echotimer.stop() ;
+    UltraEchoTime = echotimer.read();
+    UltraDistancefromObst = UltraEchoTime * (340.0*50) ;   // estimation in centimeters
+    led=0 ;
+}
+
+
+
+//***********************************************************************************************************************
